@@ -1,0 +1,37 @@
+import "google/protobuf/timestamp.proto";
+syntax = "proto3";
+package user;
+service UserService {
+  rpc GetUser (GetUserRequest) returns (GetUserResponse);
+  rpc VerifyUser (VerifyUserRequest) returns (VerifyUserResponce); 
+}
+
+message GetUserRequest { int32 id = 1; }
+
+message VerifyUserResponce {
+  bool success = 1;
+  string nextStep = 2;
+  string message = 3;
+}
+message VerifyUserRequest {
+  string email = 1;
+  string password = 2;
+  string userName = 3;
+}
+
+message GetUserResponse {
+  int32 id = 1;
+  int32 roleId = 2;
+  string email = 3;
+  string firstName = 4;
+  string lastName = 5;
+  string userName = 6;
+  string phone = 7;
+  string avatarUrl = 8;
+  string bio = 9;
+  bool isEmailverified = 10;
+  bool isActive = 11;
+  string lastLoginAt = 12;
+  string createdAt = 13;
+  string updatedAt = 14;
+}
