@@ -19,8 +19,6 @@ async function bootstrap() {
   });
 
   await app.listen();
-  console.log(
-    `User service running at ${configService.get<string>('USER_SERVICE_URL')}`,
-  );
+
 }
 bootstrap();
