@@ -1,98 +1,102 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+System Architecture & Distributed Saga Flow
+This project implements a distributed system for cleaning service management using the Transactional Outbox Pattern and Choreographed Saga.
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+🚀 Technology Stack
+Services: NestJS (Node.js)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Communication: gRPC (Internal/Streaming) & Kafka (Event Bus)
 
-## Description
+Database: PostgreSQL (Per-service isolation)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Change Data Capture (CDC): Debezium
 
-## Project setup
+Cache/Counters: Redis
 
-```bash
-$ npm install
-```
+Runtime Streams: RxJS
 
-## Compile and run the project
+📡 Global Architecture Flow
+1. The Transactional Outbox (Reliability)
 
-```bash
-# development
-$ npm run start
+To avoid the "Dual Write" problem (where the database is updated but the message queue fails), we use Debezium:
 
-# watch mode
-$ npm run start:dev
+Customer Service creates an Order and a CLEANERS_INVITED event inside a single Postgres Transaction.
 
-# production mode
-$ npm run start:prod
-```
+Debezium monitors the Postgres WAL (Write Ahead Log).
 
-## Run tests
+It captures the insert into the Outbox table and streams it to Kafka immediately.
 
-```bash
-# unit tests
-$ npm run test
+2. The Cleaner Invitation Saga
 
-# e2e tests
-$ npm run test:e2e
+Once the event is in Kafka:
 
-# test coverage
-$ npm run test:cov
-```
+Cleaner Service consumes the event and creates CleanerJob records.
 
-## Deployment
+Notification Service listens for these updates to trigger real-time UI changes.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+🔔 Service-Specific Responsibilities
+🧹 Cleaner Service
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Job Management: Tracks which cleaner is assigned to which order.
 
-```bash
-$ npm install -g mau
-$ mau deploy
-```
+Availability: Manages the "Online/Offline" status and geographical matching.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Logic: Updates job statuses (Invited -> Viewed -> Accepted -> Rejected).
 
-## Resources
+💬 Chat Service
 
-Check out a few resources that may come in handy when working with NestJS:
+Automatic Provisioning: Once a cleaner accepts a job, the Chat Service consumes the JOB_ACCEPTED event and automatically initializes a gRPC/Websocket room.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Persistence: Stores message history between Customers and Cleaners.
 
-## Support
+👤 Customer Service
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Order Orchestration: The entry point for all service requests.
 
-## Stay in touch
+Status Tracking: Monitors the overall progress of the Saga (e.g., searching for cleaner -> cleaner assigned -> cleaning in progress).
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+📡 Notification Service (gRPC Streaming)
 
-## License
+This service acts as the real-time bridge to the Mobile App:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Redis Integration: Manages atomic counters (INCR/DEL) for badges.
+
+RxJS Orchestration: Uses merge and concat to deliver data in phases:
+
+Phase 1: Instant Redis-based badge update (UPDATE_JOB_COUNTER).
+
+Phase 2: Delayed background synchronization of Job objects (JOB_DATA_SYNC).
+
+🔄 Sequence of Operations (The "Reconnect" Logic)
+When a cleaner's app connects to the Notification Service:
+
+Debezium Check: Ensures all pending events from the Outbox are already in Kafka.
+
+Redis Fetch: The service checks invites_count:cleaner:{id}.
+
+Database Fallback: If Redis is empty, the service queries the Cleaner Service for the current INVITED count, updates Redis, and pushes the number.
+
+Phased Streaming:
+
+T+0ms: User receives the notification count.
+
+T+1000ms: The stream starts pushing historical Job objects to populate the UI list without blocking the main thread.
+
+🛠 Infrastructure Setup
+Kafka Topics
+
+orders.outbox: Captured by Debezium from the Customer Service.
+
+cleaner.notifications: Triggers for Redis increments and gRPC pushes.
+
+chat.events: Signals for room creation and new message alerts.
+
+Redis Schema
+
+invites_count:cleaner:{id}: String (Integer) for job invitations.
+
+unread:chat:{roomId}:{userId}: Counters for specific chat rooms.
+
+## 1. Global Flow (Order to Kafka)
+This flow shows how Customer Service triggers the Saga via Debezium.
+
+![Order Flow](./create.order.async.flow111.jpg)
