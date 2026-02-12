@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package auth_service;
+
+service AuthService{
+  rpc Login(LoginRequest) returns(TokenPair);
+  rpc Refresh(RefreshRequest) returns(TokenPair);
+  rpc ForgotPassword(ForgotPasswordRequest) returns (Empty);
+  rpc ResetPassword(ResetPasswordRequest) returns (Empty);
+  rpc Logout(LogoutRequest) returns (Empty);
+  rpc LogoutAll(LogoutRequest) returns (Empty);
+}
+message Empty{}
+message LogoutRequest{
+  int32 userId = 1;
+  string deviceName = 2;
+}
+message ResetPasswordRequest{
+  string actionToken = 1;
+  string password = 2;
+}
+message ForgotPasswordRequest{
+  string email = 1;
+  string userName = 2;
+}
+message LoginRequest{
+  oneof login{
+    string email = 1;
+    string userName = 2;
+  }
+  string deviceName = 3;
+  string password = 4;
+}
+
+message RefreshRequest{
+  int32 userId = 1;
+  int32 tokenVersion = 2;
+  int32 profileId = 3;
+  string roleName = 4;
+  string deviceName = 5;
+}
+
+message TokenPair{
+  string accessToken = 1;
+  string refreshToken = 2;
+}
+

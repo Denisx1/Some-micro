@@ -1,0 +1,49 @@
+syntax = "proto3";
+package order_service;
+
+service OrderService {
+    rpc CreateOrder(CreateNewOrderRequest) returns (Empty);
+    rpc GetOrderById(GetOrderRequest) returns (BaseOrder);
+    rpc GetOrderHistory(GetOrderRequest) returns (HistoryResponce);
+}
+message Empty {}
+message HistoryResponce {
+  repeated OrderHistory orderHistory =1;
+}
+
+message HistoryPayload{
+  string type = 1;
+  string comment = 2;
+}
+message OrderHistory{
+  string id =1;
+  int32 aggregateId = 2;
+  string aggregateType = 3;
+  HistoryPayload payload = 4;
+}
+message GetOrderRequest{
+  int32 id = 1;
+}
+message CreateNewOrderRequest{
+    int32 customerId =1;
+    int32 zipCode =2;
+    string city = 3;
+    int32 dayOfWeek =4;
+    string fromTime =5;
+    string toTime = 6;
+    string clarifications = 7;
+}
+message BaseOrder{
+  int32 id = 1;
+  int32 customerId =2;
+  int32 zipCode =3;
+  string city = 4;
+  int32 dayOfWeek =5;
+  string fromTime =6;
+  string toTime = 7;
+  string status = 8;
+  int32 cleanerId = 9;
+  string clarifications = 10;
+}
+
+

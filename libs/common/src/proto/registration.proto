@@ -1,0 +1,17 @@
+syntax = "proto3";
+package registration_service;
+
+service RegistrationService {
+  rpc InitRegistration (InitRequest) returns (Empty); 
+  rpc ConfirmRegistration(FinalizeRequest) returns (Empty);
+}
+message Empty{}
+message InitRequest {
+  string email = 1;
+  string userName = 2;
+  string password = 3;
+  string role = 4;
+}
+message FinalizeRequest{
+  string actionToken = 1;
+}

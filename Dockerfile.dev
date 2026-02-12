@@ -1,0 +1,23 @@
+FROM node:22.19.0
+
+WORKDIR /app
+
+COPY package.json package-lock.json  ./
+# Устанавливаем зависимости
+RUN npm install
+
+# Глобально Nest CLI
+RUN npm install -g @nestjs/cli
+
+# Копируем остальные файлы сервиса и libs
+COPY libs ./libs
+COPY nest-cli.json tsconfig*.json ./
+ARG DATABASE_URL
+
+ARG SERVICE
+ENV SERVICE=${SERVICE}
+
+WORKDIR /app/apps/${SERVICE}
+
+# для dev используем ts-node
+CMD ["sh", "-c", "npm run start:dev -- $SERVICE"]

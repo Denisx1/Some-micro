@@ -1,0 +1,391 @@
+version: '3.8'
+services:
+  postgres_container:
+    image: postgres:16-alpine
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    container_name: postgres_container
+    # restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]  
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      retries: 5
+    networks:
+      - backend
+  debezium:
+    image: debezium/connect:2.4
+    container_name: debezium
+    ports:
+      - "8083:8083" # Порт для API управления
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: _connect_configs
+      OFFSET_STORAGE_TOPIC: _connect_offsets
+      STATUS_STORAGE_TOPIC: _connect_statuses
+      # Конвертеры: говорим, что данные в Кафку шлем в JSON
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      # Отключаем схемы внутри JSON (чтобы сообщения были чистыми)
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres_container:
+        condition: service_healthy
+    networks:
+      - backend
+  mongo_container:
+    image: mongo:latest
+    container_name: mongo_container
+    # restart: always # Добавил, чтобы база сама вставала при сбое
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      # В Монге базу лучше указать сразу в URI в NestJS,
+      # но здесь мы задаем админские доступы
+    volumes:
+      - storefront_data:/data/db
+    # healthcheck: # Добавил проверку для Монги, как и для Постгреса
+    #   test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+    #   interval: 10s
+    #   retries: 5
+    networks:
+      - backend
+  redis_container:
+    image: redis:alpine
+    container_name: redis_container
+    ports:
+      - '6380:6379'
+    command: ['redis-server', '--requirepass', 'secretpass']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 5
+    networks:
+      - backend
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - 9092
+    environment:
+      # --- МИР KRAFT (Управление) ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      # --- СЕТЬ (Слушатели) ---
+      # 9092 для NestJS, 29093 для внутренних нужд контроллера
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093'
+      # Важно: если NestJS в докере, пиши PLAINTEXT://kafka:9092
+      # Если NestJS на самом Маке, пиши PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+
+      # --- ОПТИМИЗАЦИЯ ---
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_RETENTION_HOURS: 12
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'kafka-topics',
+          '--bootstrap-server',
+          'localhost:9092',
+          '--list',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - '8080:8080'
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: gateway
+    container_name: gateway-service
+    ports:
+      - '3000:3000'
+    networks:
+      - backend
+    depends_on:
+      - user-service
+      - role-service
+      - registration-service
+    volumes:
+      - ./apps/gateway:/app/apps/gateway
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: npm run start:dev -- gateway
+  role-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: role
+    container_name: role-service
+    ports:
+      - '30003:30003'
+    networks:
+      - backend
+    depends_on:
+      postgres_container:
+        condition: service_healthy
+    env_file:
+      - ./apps/role/.env
+    volumes:
+      - ./apps/role:/app/apps/role
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- role"
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: auth
+    container_name: auth-service
+    ports:
+      - '30002:30002'
+    networks:
+      - backend
+    depends_on:
+      redis_container:
+        condition: service_healthy
+    env_file:
+      - ./apps/auth/.env
+    volumes:
+      - ./apps/auth:/app/apps/auth
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- auth"
+
+  chat-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: chat
+    container_name: chat-service
+    ports:
+      - '30008:30008'
+    networks:
+      - backend
+    depends_on:
+      redis_container:
+        condition: service_healthy
+    env_file:
+      - ./apps/chat/.env
+    volumes:
+      - ./apps/chat:/app/apps/chat
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- chat"
+  user-service:
+    # deploy:
+    #   replicas: 3
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: user
+    container_name: user-service
+    env_file:
+      - ./apps/user/.env
+    depends_on:
+      postgres_container:
+        condition: service_started # Для базы достаточно просто запуска
+      kafka:
+        condition: service_healthy
+    ports:
+      - '30001:30001'
+    networks:
+      - backend
+    volumes:
+      - ./apps/user:/app/apps/user
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- user"
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: notification
+    container_name: notification-service
+
+    expose:
+      - 30002
+    networks:
+      - backend
+    depends_on:
+      kafka:
+        condition: service_healthy
+    env_file:
+      - ./apps/notification/.env
+    volumes:
+      - ./apps/notification:/app/apps/notification
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: npm run start:dev -- notification
+  registration-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: registration
+    container_name: registration-service
+    env_file:
+      - ./apps/customer/.env
+    depends_on:
+      redis_container:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - '30004:30004'
+    networks:
+      - backend
+    volumes:
+      - ./apps/registration:/app/apps/registration
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: npm run start:dev -- registration
+
+  customer-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: customer
+    container_name: customer-service
+    env_file:
+      - ./apps/customer/.env
+    ports:
+      - '30005:30005'
+    networks:
+      - backend
+    volumes:
+      - ./apps/customer:/app/apps/customer
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- customer"
+
+  cleaner-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: cleaner
+    container_name: cleaner-service
+    env_file:
+      - ./apps/cleaner/.env
+    ports:
+      - '30006:30006'
+    networks:
+      - backend
+    volumes:
+      - ./apps/cleaner:/app/apps/cleaner
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- cleaner"
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: order
+    container_name: order-service
+    env_file:
+      - ./apps/order/.env
+    ports:
+      - '30007:30007'
+    networks:
+      - backend
+    volumes:
+      - ./apps/order:/app/apps/order
+      - ./libs:/app/libs
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- order"
+  projection-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        SERVICE: projection
+    container_name: projection-service
+    env_file:
+      - ./apps/projection/.env
+    ports:
+      - '30009:30009'
+    volumes:
+      - ./apps/projection:/app/apps/projection
+      - ./libs:/app/libs
+      - /app/node_modules
+      - ./nest-cli.json:/app/nest-cli.json
+      - ./package.json:/app/package.json
+    command: npm run start:dev -- projection
+    networks:
+      - backend
+volumes:
+  redis-data:
+  pgdata:
+  storefront_data:
+  kafka_data: # Добавляем сюда
+networks:
+  backend:
+    driver: bridge

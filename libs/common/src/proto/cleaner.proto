@@ -1,0 +1,175 @@
+syntax = "proto3";
+package cleaner_service;
+
+service CleanerService {
+    rpc GetJobs(GetterOthers)returns (stream Job);
+    rpc GetReviews(GetterOthers)returns (CleanerServiceResponse);
+    rpc GetSchedule(GetterOthers)returns (SchedulesData);
+
+    rpc SubscribeNotifications (SubscribeRequest) returns (stream ServiceStreamResponse);
+
+    rpc GetProfile(GetterProfileRequest)returns (CleanerProfile);
+    rpc UpdateCleanerProfile(UpdateCleanerProfileRequest) returns (CleanerProfile);
+
+    rpc SaveDaySchedule(SaveDayScheduleRequest) returns (ScheduleDay);
+    rpc UpdateSlot(UpdateSlotRequest) returns (SlotResponse);
+
+    rpc AcceptJob(HandleJobRequest) returns (CleanerJob);
+    rpc DeclineJob(HandleJobRequest) returns (Empty);
+}
+message SubscribeRequest {
+  int32 profileId = 1; // Добавляем сюда ID
+}
+
+message PersonalNotification {
+  string type = 1; // Например: "OPEN_CHAT"
+  string room_id = 2;
+  // Можно добавить любые другие поля
+}
+
+// ТО САМОЕ СООБЩЕНИЕ ДЛЯ СТРИМА
+message ServiceStreamResponse {
+  string type = 1; 
+  optional Job jobData = 2;
+  optional Chat chatData = 3;
+  optional int32 summaryData = 4;
+}
+
+
+
+message Chat{
+  int32 orderId = 1;
+  string roomId = 2;
+  int32 cleanerId = 4;
+  int32 customerId = 5;
+}
+message JobsList {
+  repeated Job items = 1;
+}
+message Empty {}
+message UpdateSlotRequest{
+  int32 id = 1;
+  int32 scheduleDayId = 2;
+  string startTime = 3;
+  string endTime = 4;
+  bool isAvailable = 5;
+}
+message HandleJobRequest{
+  int32 cleanerProfileId = 1;
+  int32 jobId = 2;
+}
+message GetterProfileRequest{
+  int32 userId = 1;
+}
+message GetterOthers{
+  int32 cleanerProfileId = 1;
+}
+message Job {
+  int32 cleanerProfileId = 1;
+  int32 orderId = 2;
+  string status =3;
+  string createdAt = 4;
+}
+message JobRequest{
+  repeated Job pastJobs = 1;
+}
+message ScheduleSlot {
+  string startTime = 1;   // "09:00"
+  string endTime = 2;     // "12:00"
+}
+message SaveDayScheduleRequest {
+  int32 cleanerProfileId = 1;
+  int32 dayOfWeek = 2;     // 0-6
+  repeated ScheduleSlot slots = 3;
+}
+message SlotResponse{
+   int32 id = 1;
+  int32 scheduleDayId = 2;
+  string startTime = 3;   // "09:00"
+  string endTime = 4;     // "12:00"
+  bool isAvailable = 5; 
+  string createdAt =6; 
+}
+message UpdateCleanerProfileRequest{
+  int32 id = 1;
+  optional string firstName = 2;
+  optional string lastName = 3;
+  optional string city = 4;
+  optional int32 zipCode = 5;
+}
+
+message CleanerProfiles {
+  int32 id = 1;
+  int32 userId = 2;
+}
+
+message CleanerProfile {
+  int32 id = 1;
+  int32 userId = 2;
+  string firstName = 3;
+  string lastName = 4;
+  string city = 5;
+  int32 zipCode = 6;
+  int32 experienceYears = 7;
+  int32 rating = 8;
+  bool busy = 9;
+  string createdAt = 10;
+  string updatedAt = 11;
+}
+
+message CleanerServiceResponse{
+  bool success=1;
+  string message=2;
+  oneof response{
+    Data data = 3;
+    ErrorDetails error=4;
+  }
+}
+message Data {
+  oneof payload {
+    SchedulesData schedule =1;
+    CleanerProfile profile =2;
+    ProfilesData profiles = 3;
+    JobsData jobs = 4;
+    CleanerJob job = 5;
+    SlotResponse slot = 6;
+  }
+}
+message ScheduleDay{
+  int32 id =1;
+  int32 cleanerProfileId = 2;
+  int32 dayOfWeek =3;
+  string createdAt =4;
+  repeated SlotResponse slots = 5;
+}
+message SchedulesData {
+  repeated ScheduleDay schedule = 1;
+}
+message ProfilesData {
+  repeated CleanerProfiles items = 1;
+}
+
+message JobsData {
+  repeated CleanerJob items = 1;
+}
+
+message CleanerJob {
+  int32 id = 1;
+  int32 cleanerProfileId = 2;
+  int32 orderId = 3;
+  string status = 4;
+  string paymentStatus = 5;
+  string createdAt = 6;
+}
+
+// Это обертка для возврата списка
+message GetJobsResponse {
+  repeated CleanerJob jobs = 1; 
+}
+
+
+message ErrorDetails{
+  int32 code = 1;     
+  string field = 2;       
+  string context = 4;
+}

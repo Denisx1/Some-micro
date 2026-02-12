@@ -1,0 +1,40 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../libs/common/src/infrastructure/prisma/generated/auth"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Auth {
+  id          Int       @id @default(autoincrement())
+  userId      Int // без связи — просто UUID пользователя
+  deviceId    String
+  deviceName  String?
+  refreshHash String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+
+  @@index([userId])
+  @@index([userId, deviceId])
+  @@index([expiresAt])
+}
+
+model AuthOutbox {
+  id        Int               @id @default(autoincrement())
+  topic     String
+  payload   Json
+  status    AuthOutboxStatus? @default(NEW)
+  createdAt DateTime?         @default(now())
+
+  @@index([status, createdAt])
+}
+
+enum AuthOutboxStatus {
+  NEW
+  SENT
+  ERROR
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+package projection_service;
+
+service ProjectionService{
+    
+}
+message ErrorDetails{
+  int32 code = 1;     
+  string field = 2;       
+  string context = 4;
+}
+message OrderServiceResponce {
+  bool success=1;
+  string message=2;
+  ErrorDetails error =3;
+}
+
