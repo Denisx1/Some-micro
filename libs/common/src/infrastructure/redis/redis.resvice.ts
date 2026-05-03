@@ -1,10 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { RedisClientType } from 'redis';
+import { Inject, Injectable } from "@nestjs/common";
+import { RedisClientType } from "redis";
 
 @Injectable()
 export class RedisService {
   constructor(
-    @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
+    @Inject("REDIS_CLIENT") private readonly redis: RedisClientType
   ) {}
   async incr(key: string): Promise<number> {
     return await this.redis.incr(key);
@@ -64,6 +64,32 @@ export class RedisService {
   async del(key: string) {
     return this.redis.del(key);
   }
+
+  async hSet<T extends Record<string, any>>(
+    key: string,
+    value: T,
+    ttlSeconds?: number
+  ) {
+    // Важливо: Node-Redis в hSet приймає об'єкт, але значення мають бути string/number
+    await this.redis.hSet(key, value);
+
+    if (ttlSeconds) {
+      await this.redis.expire(key, ttlSeconds);
+    }
+  }
+
+  // Універсальний hGetAll: дістає весь об'єкт цілком
+  async hGetAll<T>(key: string): Promise<T | null> {
+    const result = await this.redis.hGetAll(key);
+
+    // Якщо Redis повернув порожній об'єкт (ключа немає), повертаємо null
+    if (!result || Object.keys(result).length === 0) {
+      return null;
+    }
+
+    return result as T;
+  }
+
   async delAll(keyWord: string) {
     const iterator = this.redis.scanIterator({
       MATCH: keyWord,
@@ -74,7 +100,7 @@ export class RedisService {
     }
   }
   async mget<T extends any[]>(
-    keys: string[],
+    keys: string[]
   ): Promise<{ [K in keyof T]: T[K] | null }> {
     const results = await this.redis.mGet(keys);
 
@@ -82,7 +108,7 @@ export class RedisService {
       if (item === null) return null;
 
       // Умный парсинг
-      if (item.startsWith('{') || item.startsWith('[')) {
+      if (item.startsWith("{") || item.startsWith("[")) {
         try {
           return JSON.parse(item);
         } catch {
@@ -97,18 +123,35 @@ export class RedisService {
   async saveHashObject<T extends Record<string, any>>(
     key: string,
     data: T,
-    ttl: number,
+    ttl: number
   ): Promise<void> {
     const pipeline = this.redis.multi();
 
     // Преобразуем объект в плоскую структуру для Redis Hash
     for (const [field, value] of Object.entries(data)) {
       const val =
-        typeof value === 'object' ? JSON.stringify(value) : String(value);
+        typeof value === "object" ? JSON.stringify(value) : String(value);
       pipeline.hSet(key, field, val);
     }
 
     pipeline.expire(key, ttl);
+    await pipeline.exec();
+  }
+  async updateHashObject<T extends Record<string, any>>(
+    key: string,
+    data: T
+  ): Promise<void> {
+    const pipeline = this.redis.multi();
+
+    for (const [field, value] of Object.entries(data)) {
+      // Важно: если value — это объект (например, вложенные данные юзера), серилизуем его
+      const val =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+      pipeline.hSet(key, field, val);
+    }
+
+    // При обновлении обычно не нужно сбрасывать TTL,
+    // но если хочешь продлить жизнь сессии — можно добавить pipeline.expire(key, ttl)
     await pipeline.exec();
   }
 

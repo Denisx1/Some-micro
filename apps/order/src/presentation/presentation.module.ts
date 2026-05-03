@@ -1,15 +1,11 @@
 import { Module } from '@nestjs/common';
-import { OrderGrpcController } from './controllers';
 import { ApplicationModule } from '../application/application.module';
 import { OrderCommandController } from './controllers/kafka/order.command.controller';
-import { OrderKafkaController } from './controllers/kafka/order.kafka.controller';
+import { InfrastructureModule } from '../infrastructure/infrastruncture.module';
+import { OrderGrpcController } from './controllers/grpc/order.grpc.controller';
 
 @Module({
-  imports: [ApplicationModule],
-  controllers: [
-    OrderGrpcController,
-    OrderCommandController,
-    OrderKafkaController,
-  ],
+  imports: [ApplicationModule, InfrastructureModule],
+  controllers: [OrderGrpcController, OrderCommandController],
 })
 export class PresentationModule {}

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './presentation/controller/auth.controller';
 import { ConfigModule } from '@nestjs/config';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { ApplicationModule } from './application/aplication.module';
@@ -16,7 +15,7 @@ import { PresentationModule } from './presentation/presentstion.module';
     PresentationModule,
     InfrastructureModule,
   ],
-  controllers: [AuthController],
+  controllers: [],
   providers: [],
 })
 export class AuthModule {}

@@ -1,22 +1,21 @@
-import { Controller } from '@nestjs/common';
-import { CustomerFacade } from '../../application/customer.facade';
-import { GrpcMethod } from '@nestjs/microservices';
-import { CustomerServiceController, GetCustomer } from '@app/common/domain';
-import { Observable } from 'rxjs';
-
-import { Customer } from '@app/common/infrastructure/prisma/generated/customer';
+import { Controller, UseInterceptors } from "@nestjs/common";
+import { GrpcMethod } from "@nestjs/microservices";
+import { QueryBus } from "@nestjs/cqrs";
+import {
+  Customer,
+  CustomerServiceController,
+  GetCustomerRequest,
+} from "@app/common";
+import { GetCustomerQuery } from "@app/customer/domain/query";
+import { GrpcClientInterceptor } from "@app/common/system/interceptor/common.interceptor";
 
 @Controller()
+@UseInterceptors(GrpcClientInterceptor)
 export class CustomerGrpcController implements CustomerServiceController {
-  constructor(private readonly customerFacade: CustomerFacade) {}
+  constructor(private readonly queryBus: QueryBus) {}
 
-  @GrpcMethod('CustomerService', 'GetCustomer')
-  getCustomer(request: GetCustomer): Observable<Customer> {
-    return this.customerFacade.getCustomer(request.userId);
-  }
-  @GrpcMethod('CustomerService', 'SubscribeNotifications')
-  subscribe(data: { customerId: number }) {
-    console.log(data)
-    return this.customerFacade.notifyCustomer(data.customerId);
+  @GrpcMethod("CustomerService", "GetCustomer")
+  async getCustomer(request: GetCustomerRequest): Promise<Customer> {
+    return await this.queryBus.execute(new GetCustomerQuery(request));
   }
 }

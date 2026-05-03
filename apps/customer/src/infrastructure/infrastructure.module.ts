@@ -1,30 +1,21 @@
-import {
-  CustomerClient,
-  KafkaModule,
-  PrismaModule,
-  RedisModule,
-  RedisService,
-} from '@app/common/infrastructure';
-import { Module } from '@nestjs/common';
-import { CustomerRepository } from './repository/customer.repository';
-import { StreamService } from '@app/common/system/stream/stream.manager.service';
-import { KafkaConsumerInterceptor } from '@app/common/system/interceptor/kafka.interceptor';
-import { GRPC_PRISMA_SERVICES } from '@app/common/domain';
+import { Module } from "@nestjs/common";
+
+import { PrismaModule } from "@app/common";
+import { RedisModule } from "@app/common/infrastructure/redis/redis.module";
+import { CustomerRepositories } from "./repository";
+import { CustomerPrismaService } from "@app/customer/infrastructure/prisma/prisma.customer.service";
+import { CqrsModule } from "@nestjs/cqrs";
+import { PrismaClient as CustomerClient } from '@app/customer/infrastructure/prisma/generated';
 
 @Module({
-  imports: [
-    PrismaModule.forRoot(CustomerClient),
-    KafkaModule.register(GRPC_PRISMA_SERVICES.ORDER),
-    RedisModule,
-  ],
+  imports: [PrismaModule.forRoot(CustomerClient), RedisModule, CqrsModule],
   controllers: [],
-  providers: [CustomerRepository, StreamService, KafkaConsumerInterceptor],
+  providers: [...CustomerRepositories, CustomerPrismaService],
   exports: [
-    CustomerRepository,
-    KafkaConsumerInterceptor,
-    KafkaModule,
-    StreamService,
     RedisModule,
+    CustomerPrismaService,
+    ...CustomerRepositories,
+    CqrsModule,
   ],
 })
 export class InfrastructureModule {}

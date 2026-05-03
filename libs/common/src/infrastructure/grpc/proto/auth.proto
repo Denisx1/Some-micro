@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package auth;
+
+service AuthService {
+  rpc ConfirmRegistration(ConfirmRegistrationRequest) returns (ActionResponse);
+  rpc Login(LoginRequest) returns (TokenResponse);
+  rpc RefreshTokens(RefreshTokensRequest) returns (TokenResponse);
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ActionResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ActionResponse);
+  rpc Logout(LogoutRequest) returns (ActionResponse);
+  rpc TerminateAllSessions(TerminateAllSessionsRequest) returns (EmptyResponse);
+}
+
+message ConfirmRegistrationRequest{
+  string actionToken = 1;
+}
+message ActionResponse {
+  bool success = 1;
+  int32 id = 2;
+}
+message EmptyResponse {}
+
+message LoginRequest {
+  oneof identifier {
+    string email = 1;
+    string userName = 2;
+  }
+  string password = 3;
+  string deviceName = 4;
+}
+
+message RefreshTokensRequest {
+  int32 userId = 1;
+  int32 tokenVersion = 2;
+  int32 profileId = 3;
+  string roleName = 4;
+}
+
+message ForgotPasswordRequest {
+  oneof identifier {
+    string email = 1;
+    string userName = 2;
+  }
+}
+
+message ResetPasswordRequest {
+  string actionToken = 1;
+  string password = 2;
+}
+
+message LogoutRequest {
+  int32 userId = 1;
+
+}
+
+message TerminateAllSessionsRequest {
+  int32 userId = 1;
+}
+
+message TokenResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+}

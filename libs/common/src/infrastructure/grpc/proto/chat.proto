@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package chat_service;
+
+service ChatService{
+  rpc SendMessage(ChatMessage) returns (ChatMessage);
+}
+
+message ChatMessage {
+  string roomId = 1;
+  int32 senderId = 2;
+  string text = 3;
+}
+
+
+
+
+

@@ -21,6 +21,19 @@ export class ChatRepository {
       throw new DatabaseError('Chat');
     }
   }
+  async getChatById(
+    roomId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ChatRoom | null> {
+    try {
+      const client = tx?.chatRoom ?? this.prismaService.prisma.chatRoom;
+      const existingRoom = await client.findUnique({ where: { id: roomId } });
+      return existingRoom ?? null;
+    } catch (error) {
+      throw new DatabaseError('Chat');
+    }
+  }
+
   async createRoom(
     newRoom: Prisma.ChatRoomCreateInput,
     tx?: Prisma.TransactionClient,

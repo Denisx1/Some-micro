@@ -1,10 +1,11 @@
-import { Catch, RpcExceptionFilter } from '@nestjs/common';
+import { Catch, RpcExceptionFilter } from "@nestjs/common";
 
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError } from "rxjs";
 
-import { RpcException } from '@nestjs/microservices';
-import { IServiceError } from '@app/common/domain/types/error';
-import { DomainError, InfrastructureError } from '../error/base.error';
+import { RpcException } from "@nestjs/microservices";
+
+import { DomainError, InfrastructureError } from "../error/base.error";
+import { IServiceError } from "../error/types";
 
 @Catch()
 export class InternalRpcExceptionsFilter

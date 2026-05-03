@@ -1,0 +1,18 @@
+
+syntax = "proto3";
+package customer;
+
+service CustomerService {
+    rpc GetCustomer(GetCustomerRequest) returns (Customer);
+}
+message GetCustomerRequest{
+  optional int32 userId = 1;
+  optional int32 id = 2;
+}
+message Customer{
+    int32 id = 1; 
+    int32 userId = 2;
+    string firstName = 3;
+    string lastName = 4;
+
+    }

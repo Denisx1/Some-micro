@@ -1,29 +1,33 @@
-import { UpdateOrderType } from '@app/common/domain/types/grpc.services.types/order';
-import { OrderClient, PrismaService } from '@app/common/infrastructure';
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
+import { DatabaseError } from "@app/common/system";
 import {
   Order,
   Prisma,
-} from '@app/common/infrastructure/prisma/generated/order';
-import { DatabaseError } from '@app/common/system';
+} from "libs/order/src/infrastructure/prisma/generated/client";
+import { OrderPrismaService } from "libs/order/src";
 
 @Injectable()
 export class OrderRepository {
-  constructor(private readonly prismaService: PrismaService<OrderClient>) {}
-  async getOrder(id: number): Promise<Order | null> {
+  constructor(private readonly prismaService: OrderPrismaService) {}
+  async getOrder(
+    id: number,
+    tx?: Prisma.TransactionClient
+  ): Promise<Order | null> {
     try {
-      const order = await this.prismaService.prisma.order.findFirst({
+      const client = tx ?? this.prismaService.prisma;
+      const order = await client.order.findFirst({
         where: { id },
       });
+
       return order ?? null;
     } catch (error) {
-      throw new DatabaseError('OrderRepository.getOrder');
+      throw new DatabaseError("OrderRepository.getOrder");
     }
   }
   async findUnique(
     orderId: number,
     cleanerId: number,
-    tx?: Prisma.TransactionClient,
+    tx?: Prisma.TransactionClient
   ): Promise<Order | null> {
     try {
       const client = tx?.order ?? this.prismaService.prisma.order;
@@ -32,34 +36,34 @@ export class OrderRepository {
       });
       return existind ?? null;
     } catch (error) {
-      throw new DatabaseError('OrderRepository.createOrder');
+      throw new DatabaseError("OrderRepository.createOrder");
     }
   }
   async createOrder(
     newOrder: Prisma.OrderCreateInput,
-    tx?: Prisma.TransactionClient,
+    tx?: Prisma.TransactionClient
   ): Promise<Order> {
     try {
       return await tx.order.create({
         data: newOrder,
       });
     } catch (error) {
-      throw new DatabaseError('OrderRepository.createOrder');
+      throw new DatabaseError("OrderRepository.createOrder");
     }
   }
-  async updateOrder(
-    orderId: number,
-    payload: UpdateOrderType,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Order> {
-    try {
-      const client = tx?.order ?? this.prismaService.prisma.order;
-      return await client.update({
-        where: { id: orderId },
-        data: payload,
-      });
-    } catch (error) {
-      throw new DatabaseError('OrderRepository.updateOrder');
-    }
-  }
+  // async updateOrder(
+  //   orderId: number,
+  //   payload: IUpdateOrder,
+  //   tx?: Prisma.TransactionClient
+  // ): Promise<Order> {
+  //   try {
+  //     const client = tx?.order ?? this.prismaService.prisma.order;
+  //     return await client.update({
+  //       where: { id: orderId },
+  //       data: payload,
+  //     });
+  //   } catch (error) {
+  //     throw new DatabaseError("OrderRepository.updateOrder");
+  //   }
+  // }
 }

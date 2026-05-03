@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ChatOutboxRepository } from '../../../infrastructure/repositories/chat.outbox.repository';
-import { ChatRoom } from '@app/common/infrastructure/prisma/generated/chat';
 import { ChatRepository } from '../../../infrastructure/repositories/chat.repository';
 import { ChatClient, PrismaService } from '@app/common/infrastructure';
 import { AlreadyExistError } from '@app/common/system';
 import { KafkaTopics, SagaEvents } from '@app/common/domain';
-import { from, map, Observable, of } from 'rxjs';
+import { from, Observable } from 'rxjs';
 import { Prisma } from '@app/common/infrastructure/prisma/generated/chat';
 
 @Injectable()
@@ -22,12 +21,14 @@ export class CreateChatService {
     payload: Prisma.ChatRoomCreateInput,
   ): Promise<void> {
     return await this.prismaService.prisma.$transaction(async (tx) => {
-      const existingChat = await this.chatRepository.findUnique(payload.orderId);
- 
+      const existingChat = await this.chatRepository.findUnique(
+        payload.orderId,
+      );
+
       if (existingChat) throw new AlreadyExistError('chat');
-     
+
       const newChat = await this.chatRepository.createRoom(payload, tx);
-     
+
       await this.chatOutboxRepository.createEvent(
         {
           aggregateId: payload.orderId,

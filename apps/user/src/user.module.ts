@@ -16,5 +16,6 @@ import { PresentationModule } from './presentation/presentation.module';
     ApplicationModule,
     StartUpModule,
   ],
+  exports:[ConfigModule]
 })
 export class UserModule {}

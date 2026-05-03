@@ -1,0 +1,87 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../libs/order/src/infrastructure/prisma/generated"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id             Int          @id @default(autoincrement())
+  customerId     Int
+  zipCode        Int
+  city           String
+  dayOfWeek      Int // день заказа
+  fromTime       String // "16:00"
+  toTime         String // "17:00"
+  status         OrderStatus? @default(PENDING)
+  cleanerId      Int? // заполнится, когда кто-то подтвердит
+  clarifications String?      @default("")
+
+  @@index([id])
+}
+
+model OrderInvitation {
+  id                Int              @id @default(autoincrement())
+  orderId           Int
+  cleanerProfileId  Int
+  cleanerName       String // Кэшируем имя здесь, чтобы не ходить в user-service каждый раз
+  customer_decision CustomerDecision @default(PENDING)
+  cleaner_status    CleanerStatus    @default(PENDING)
+  rating            Float
+  status            InvitationStatus @default(FOUND)
+  createdAt         DateTime         @default(now())
+
+  @@unique([orderId, cleanerProfileId])
+  @@map("order_invitation") // Саму таблицу тоже лучше в нижний регистр
+}
+
+model OrderOutbox {
+  id            String   @id @default(uuid())
+  aggregateType String   @map("aggregatetype") // В коде camelCase, в БД snake_case
+  aggregateId   Int      @map("aggregateid") // В коде camelCase, в БД snake_case
+  payload       Json
+  createdAt     DateTime @default(now()) @map("createdat")
+
+  @@map("order_outbox") // Саму таблицу тоже лучше в нижний регистр
+}
+
+enum CustomerDecision {
+  PENDING
+  SELECTED
+  NOT_SELECTED
+}
+
+enum CleanerStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  HIDE
+}
+
+enum InvitationStatus {
+  FOUND // Просто показали заказчику в списке
+  INVITED // Заказчик выбрал этого клинера, ждем ответа
+  ACCEPTED // Клинер согласился
+  REJECTED // Клинер отказался
+  EXPIRED // Время вышло
+  HIDE
+}
+
+enum OutboxOrderStatus {
+  NEW
+  SENT
+  ERROR
+}
+
+enum OrderStatus {
+  INVITED
+  DONE
+  EXPIRED
+  IN_PROGRESS
+  WAITING_FRO_CLEANER
+  PENDING
+}

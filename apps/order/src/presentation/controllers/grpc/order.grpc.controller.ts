@@ -1,39 +1,55 @@
-import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
-import { OrderQueryFacade } from 'apps/order/src/application/order.query.facade';
-import { Observable, tap } from 'rxjs';
-import {
-  CreateOrder,
-  GetOrderById,
-  OrderServiceController,
-} from '@app/common/domain/types/grpc.services.types/order';
+import { Controller } from "@nestjs/common";
+import { GrpcMethod } from "@nestjs/microservices";
+import { from, mergeAll } from "rxjs";
+import { CommandBus, QueryBus } from "@nestjs/cqrs";
 
 import {
-  Order,
-  OrderOutbox,
-} from '@app/common/infrastructure/prisma/generated/order';
-import { OrderCommandFacade } from 'apps/order/src/application/order.command.facade';
-import { OutboxArray } from '@app/common/domain/types/outbox.event';
+  GetOrderByIdQuery,
+  GetOrderHistoryQuery,
+} from "apps/order/src/application/use.case/query/implementation/order.query";
+import {
+  CreateNewOrderRequest,
+  GetOrderRequest,
+  InviteCleanerRequest,
+} from "@app/common/contracts/order/order.grpc.types";
+import {
+  CreateOrderCommand,
+  SelectCleanerCommand,
+} from "libs/order/src/domain/command";
 
 @Controller()
-export class OrderGrpcController implements OrderServiceController {
+export class OrderGrpcController {
   constructor(
-    private readonly orderQueryFacade: OrderQueryFacade,
-    private readonly orderCommandFacade: OrderCommandFacade,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus
   ) {}
 
-  @GrpcMethod('OrderService', 'CreateOrder')
-  createOrder(request: CreateOrder): Observable<void> {
-    return this.orderCommandFacade.createOrder(request);
+  @GrpcMethod("OrderService", "CreateOrder")
+  async createOrder(request: CreateNewOrderRequest) {
+    const createdId = await this.commandBus.execute(
+      new CreateOrderCommand(request)
+    );
+    return { status: "Order was created successfully", id: createdId };
   }
 
-  @GrpcMethod('OrderService', 'GetOrderById')
-  getOrderById(request: GetOrderById): Observable<Order> {
-    return this.orderQueryFacade.getOrderById(request);
+  @GrpcMethod("OrderService", "GetOrderById")
+  async getOrderById(request: GetOrderRequest) {
+    const query = new GetOrderByIdQuery(request.id);
+    return await this.queryBus.execute(query);
   }
 
-  @GrpcMethod('OrderService', 'GetOrderHistory')
-  getOrderHistory(request: GetOrderById): Observable<OutboxArray> {
-    return this.orderQueryFacade.getOrderHistory(request);
+  @GrpcMethod("OrderService", "GetOrderHistory")
+  getOrderHistory(request: GetOrderRequest) {
+    return from(
+      this.queryBus.execute(new GetOrderHistoryQuery(request.id))
+    ).pipe(mergeAll());
+  }
+
+  @GrpcMethod("OrderService", "SelectCleaner")
+  async selectCleaner(request: InviteCleanerRequest) {
+    const createdId = await this.commandBus.execute(
+      new SelectCleanerCommand(request)
+    );
+    return { status: "Cleaner selected successfully", id: createdId };
   }
 }

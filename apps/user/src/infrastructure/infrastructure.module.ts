@@ -1,42 +1,40 @@
-import { GRPC_PRISMA_SERVICES } from '@app/common/domain';
-import {
-  GrpcModule,
-  HashModule,
-  KafkaModule,
-  PrismaModule,
-  RedisModule,
-  UserClient,
-} from '@app/common/infrastructure';
-import { Module } from '@nestjs/common';
-import { UserRepository } from './repositories/user.repository';
-import { UserCasheService } from './cashe/user.cache.service';
-import { UserOutboxRepository } from './repositories/user.outbox.repository';
-import { UserRoleCashService } from './cashe/role.cashe';
-import { GrpcClientsService } from '../../../../libs/common/src/infrastructure/grpc/grpc-clients.service';
+import { Module } from "@nestjs/common";
+import { UserRepository } from "./repositories/user.repository";
+import { UserCasheService } from "./cashe/user.cache.service";
+import { UserOutboxRepository } from "./repositories/user.outbox.repository";
+import { UserRoleCashService } from "./cashe/role.cashe";
+import { PrismaModule } from "@app/common";
+import { UserRoleRepository } from "./repositories/user.role.repository";
+import { RedisModule } from "@app/common/infrastructure/redis/redis.module";
+import { UserPrismaService } from "@app/user";
+import { CqrsModule } from "@nestjs/cqrs";
+import { PrismaClient as UserClient } from "@app/user";
+import { HashModule } from "@app/common/infrastructure/hash/hash.module";
+import { HashService } from "@app/common/infrastructure/hash/hash.service";
+import { userRedis } from "./cashe";
+import { userRepositories } from "./repositories";
 
 @Module({
   imports: [
-    GrpcModule.register([GRPC_PRISMA_SERVICES.ROLE]),
+    CqrsModule,
     PrismaModule.forRoot(UserClient),
-    HashModule,
     RedisModule,
+    CqrsModule,
+    HashModule,
   ],
   controllers: [],
   providers: [
-    UserRepository,
-    UserRoleCashService,
-    UserCasheService,
-    UserOutboxRepository,
-    GrpcClientsService,
+    ...userRedis,
+    ...userRepositories,
+    UserPrismaService,
+    HashService,
   ],
   exports: [
-    HashModule,
-    RedisModule,
-    GrpcClientsService,
-    UserRepository,
-    UserRoleCashService,
-    UserCasheService,
-    UserOutboxRepository,
+    UserPrismaService,
+    CqrsModule,
+    HashService,
+    ...userRedis,
+    ...userRepositories,
   ],
 })
 export class InfrastructureModule {}

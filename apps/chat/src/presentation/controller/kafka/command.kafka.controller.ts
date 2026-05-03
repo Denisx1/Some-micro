@@ -6,7 +6,7 @@ import { CommandChatFacade } from 'apps/chat/src/application/chat.facade';
 import { Observable } from 'rxjs';
 
 @Controller()
-export class OrderKafkaController {
+export class ChatKafkaController {
   constructor(private readonly commandChatFacade: CommandChatFacade) {}
 
   @EventPattern(KafkaTopics.Commands.CHAT)

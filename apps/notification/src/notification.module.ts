@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { NotificationService } from './notification.service';
 
 import { ConfigModule } from '@nestjs/config';
 
-import { NotificationController } from './notification.controller';
-import { EmailStrategy } from './strategy/email.strategy';
+import { EmailStrategy } from './application/strategy/email.strategy';
+import { ApplicationModule } from './application/application.module';
+import { PresentationModule } from './presentation/presentation.module';
 
 @Module({
   imports: [
@@ -12,8 +12,10 @@ import { EmailStrategy } from './strategy/email.strategy';
       isGlobal: true,
       envFilePath: `${process.cwd()}/apps/notification/.env`,
     }),
+    ApplicationModule,
+    PresentationModule,
   ],
-  controllers: [NotificationController],
-  providers: [NotificationService, EmailStrategy],
+
+  providers: [],
 })
 export class NotificationModule {}

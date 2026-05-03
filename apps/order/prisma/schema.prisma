@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../../../libs/common/src/infrastructure/prisma/generated/order"
+  output   = "../../../libs/order/src/infrastructure/prisma/generated"
   binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
@@ -23,6 +23,20 @@ model Order {
 
   @@index([id])
 }
+model OrderInvitation {
+  id               Int      @id @default(autoincrement())
+  orderId          Int
+  cleanerProfileId Int
+  cleanerName        String   // Кэшируем имя здесь, чтобы не ходить в user-service каждый раз
+  customer_decision CustomerDecision @default(PENDING)
+  cleaner_status   CleanerStatus @default(PENDING)
+  rating           Float
+  status           InvitationStatus @default(FOUND)
+  createdAt        DateTime @default(now())
+
+  @@unique([orderId, cleanerProfileId])
+  @@map("order_invitation") // Саму таблицу тоже лучше в нижний регистр
+}
 
 model OrderOutbox {
   id            String   @id @default(uuid())
@@ -32,6 +46,25 @@ model OrderOutbox {
   createdAt     DateTime @default(now()) @map("createdat")
 
   @@map("order_outbox") // Саму таблицу тоже лучше в нижний регистр
+}
+enum CustomerDecision{
+  PENDING 
+  SELECTED
+  NOT_SELECTED
+}
+enum CleanerStatus {
+  PENDING 
+  ACCEPTED
+  REJECTED
+  HIDE
+}
+enum InvitationStatus {
+  FOUND      // Просто показали заказчику в списке
+  INVITED    // Заказчик выбрал этого клинера, ждем ответа
+  ACCEPTED   // Клинер согласился
+  REJECTED   // Клинер отказался
+  EXPIRED    // Время вышло
+  HIDE 
 }
 
 enum OutboxOrderStatus{

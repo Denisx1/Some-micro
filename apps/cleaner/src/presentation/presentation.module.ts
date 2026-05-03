@@ -1,28 +1,12 @@
-import { Module } from '@nestjs/common';
-import { CleanerGrpcController } from './grpc/cleaner.controller';
-import {
-  JobModule,
-  ProfileModule,
-  ReviewModule,
-  ScheduleCleanerModule,
-} from '../modules';
-import { InfrastructureModule } from '../infrastructure/infrastructure.module';
-import { CleanerCommandController } from './kafka/controllers/cleaner.command.controller';
-import { CleanerKafkaController } from './kafka/controllers/cleaner.kafka.controller';
+import { Module } from "@nestjs/common";
+
+import { InfrastructureModule } from "../infrastructure/infrastructure.module";
+import { CleanerCommandController } from "./kafka/controllers/cleaner.command.controller";
+import { CleanerGrpcController } from "./grpc/cleaner.controller";
 
 @Module({
-  imports: [
-    JobModule,
-    ProfileModule,
-    ScheduleCleanerModule,
-    ReviewModule,
-    InfrastructureModule,
-  ],
-  controllers: [
-    CleanerGrpcController,
-    CleanerCommandController,
-    CleanerKafkaController,
-  ],
+  imports: [InfrastructureModule],
+  controllers: [CleanerCommandController, CleanerGrpcController],
   providers: [],
   exports: [],
 })

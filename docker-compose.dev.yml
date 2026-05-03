@@ -1,5 +1,12 @@
 version: '3.8'
 services:
+  grpc-ui:
+    image: fullstorydev/grpcui
+    command: -plaintext order-service:30007 # підключаємося до твого сервісу
+    ports:
+      - '8070:8070'
+    networks:
+      - backend
   postgres_container:
     image: postgres:16-alpine
     logging:
@@ -12,7 +19,16 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
-    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]  
+    command:
+      [
+        'postgres',
+        '-c',
+        'wal_level=logical',
+        '-c',
+        'max_replication_slots=10',
+        '-c',
+        'max_wal_senders=10',
+      ]
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -27,7 +43,7 @@ services:
     image: debezium/connect:2.4
     container_name: debezium
     ports:
-      - "8083:8083" # Порт для API управления
+      - '8083:8083' # Порт для API управления
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: 1
@@ -38,8 +54,8 @@ services:
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       # Отключаем схемы внутри JSON (чтобы сообщения были чистыми)
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: 'false'
+      KEY_CONVERTER_SCHEMAS_ENABLE: 'false'
     depends_on:
       kafka:
         condition: service_healthy
@@ -149,46 +165,24 @@ services:
       - '3000:3000'
     networks:
       - backend
-    depends_on:
-      - user-service
-      - role-service
-      - registration-service
+    # depends_on:
+    #   - user-service
+    #   - role-service
+    #   - registration-service
     volumes:
       - ./apps/gateway:/app/apps/gateway
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
     command: npm run start:dev -- gateway
-  role-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-      args:
-        SERVICE: role
-    container_name: role-service
-    ports:
-      - '30003:30003'
-    networks:
-      - backend
-    depends_on:
-      postgres_container:
-        condition: service_healthy
-    env_file:
-      - ./apps/role/.env
-    volumes:
-      - ./apps/role:/app/apps/role
-      - ./libs:/app/libs
-      - ./nest-cli.json:/app/nest-cli.json
-      - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- role"
 
-  auth-service:
+  auth:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: auth
-    container_name: auth-service
+    container_name: auth
     ports:
       - '30002:30002'
     networks:
@@ -200,18 +194,21 @@ services:
       - ./apps/auth/.env
     volumes:
       - ./apps/auth:/app/apps/auth
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/auth:/app/libs/auth
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- auth"
+      - /app/node_modules
 
-  chat-service:
+    # command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- auth"
+
+  chat:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: chat
-    container_name: chat-service
+    container_name: chat
     ports:
       - '30008:30008'
     networks:
@@ -223,11 +220,13 @@ services:
       - ./apps/chat/.env
     volumes:
       - ./apps/chat:/app/apps/chat
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/chat:/app/libs/chat
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- chat"
-  user-service:
+      - /app/node_modules
+    # command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- chat"
+  user:
     # deploy:
     #   replicas: 3
     build:
@@ -235,7 +234,9 @@ services:
       dockerfile: Dockerfile.dev
       args:
         SERVICE: user
-    container_name: user-service
+    environment:
+      - SERVICE=user
+    container_name: user
     env_file:
       - ./apps/user/.env
     depends_on:
@@ -249,21 +250,23 @@ services:
       - backend
     volumes:
       - ./apps/user:/app/apps/user
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/user:/app/libs/user
       - ./nest-cli.json:/app/nest-cli.json
+      - /app/node_modules
       - ./package.json:/app/package.json
 
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- user"
-  notification-service:
+    # command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- user"
+  notification:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: notification
-    container_name: notification-service
+    container_name: notification
 
-    expose:
-      - 30002
+    ports:
+      - '30003:30003'
     networks:
       - backend
     depends_on:
@@ -273,42 +276,20 @@ services:
       - ./apps/notification/.env
     volumes:
       - ./apps/notification:/app/apps/notification
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/notification:/app/libs/notification
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: npm run start:dev -- notification
-  registration-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-      args:
-        SERVICE: registration
-    container_name: registration-service
-    env_file:
-      - ./apps/customer/.env
-    depends_on:
-      redis_container:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    ports:
-      - '30004:30004'
-    networks:
-      - backend
-    volumes:
-      - ./apps/registration:/app/apps/registration
-      - ./libs:/app/libs
-      - ./nest-cli.json:/app/nest-cli.json
-      - ./package.json:/app/package.json
-    command: npm run start:dev -- registration
+        - /app/node_modules
+    # command: npm run start:dev -- notification
 
-  customer-service:
+  customer:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: customer
-    container_name: customer-service
+    container_name: customer
     env_file:
       - ./apps/customer/.env
     ports:
@@ -317,18 +298,18 @@ services:
       - backend
     volumes:
       - ./apps/customer:/app/apps/customer
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/customer:/app/libs/customer
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- customer"
 
-  cleaner-service:
+  cleaner:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: cleaner
-    container_name: cleaner-service
+    container_name: cleaner
     env_file:
       - ./apps/cleaner/.env
     ports:
@@ -337,18 +318,20 @@ services:
       - backend
     volumes:
       - ./apps/cleaner:/app/apps/cleaner
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/cleaner:/app/libs/cleaner
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- cleaner"
+      - /app/node_modules
+    # command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- cleaner"
 
-  order-service:
+  order:
     build:
       context: .
       dockerfile: Dockerfile.dev
       args:
         SERVICE: order
-    container_name: order-service
+    container_name: order
     env_file:
       - ./apps/order/.env
     ports:
@@ -357,10 +340,12 @@ services:
       - backend
     volumes:
       - ./apps/order:/app/apps/order
-      - ./libs:/app/libs
+      - ./libs/common:/app/libs/common
+      - ./libs/order:/app/libs/order
       - ./nest-cli.json:/app/nest-cli.json
       - ./package.json:/app/package.json
-    command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- order"
+      - /app/node_modules
+    # command: sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma && npm run start:dev -- order"
   projection-service:
     build:
       context: .
@@ -386,6 +371,7 @@ volumes:
   pgdata:
   storefront_data:
   kafka_data: # Добавляем сюда
+
 networks:
   backend:
     driver: bridge

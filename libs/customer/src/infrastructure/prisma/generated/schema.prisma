@@ -1,0 +1,28 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../libs/customer/src/infrastructure/prisma/generated/"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique() // связь логическая, не FK
+  firstName String?
+  lastName  String?
+  createdAt DateTime @default(now())
+}
+
+model CustomerOutbox {
+  id            String   @id @default(uuid())
+  aggregateType String   @map("aggregatetype")
+  aggregateId   Int      @map("aggregateid")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("createdat")
+
+  @@map("customer_outbox")
+}

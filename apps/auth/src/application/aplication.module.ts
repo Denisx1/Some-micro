@@ -1,27 +1,12 @@
-import { Module } from '@nestjs/common';
-import { InfrastructureModule } from '../infrastructure/infrastructure.module';
-import { AuthFacade } from './auth.facade';
-import {
-  ForgotPasswordService,
-  LoginService,
-  LogoutAllService,
-  LogoutService,
-  RefreshService,
-  ResetPasswordService,
-} from './use-cases';
+import { Module } from "@nestjs/common";
+import { InfrastructureModule } from "../infrastructure/infrastructure.module";
+import { commandHandlers } from "./command";
+import { AuthUseCases } from "./use-cases";
 
 @Module({
   imports: [InfrastructureModule],
   controllers: [],
-  providers: [
-    AuthFacade,
-    ForgotPasswordService,
-    LoginService,
-    LogoutAllService,
-    LogoutService,
-    RefreshService,
-    ResetPasswordService,
-  ],
-  exports: [AuthFacade],
+  providers: [...commandHandlers, ...AuthUseCases],
+  exports: [],
 })
 export class ApplicationModule {}

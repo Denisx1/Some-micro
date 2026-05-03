@@ -1,16 +1,23 @@
-import { GRPC_PRISMA_SERVICES } from '@app/common/domain';
-import { CustomerClient, PrismaService } from '@app/common/infrastructure';
-import { Customer } from '@app/common/infrastructure/prisma/generated/customer';
-import { DatabaseError } from '@app/common/system';
-import { Injectable } from '@nestjs/common';
+import { GetCustomerRequest } from "@app/common";
+import { DatabaseError } from "@app/common/system";
+import {
+  Customer,
+  Prisma,
+} from "@app/customer/infrastructure/prisma/generated";
+import { CustomerPrismaService } from "@app/customer/infrastructure/prisma/prisma.customer.service";
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class CustomerRepository {
-  constructor(private readonly prismaService: PrismaService<CustomerClient>) {}
+  constructor(private readonly prismaService: CustomerPrismaService) {}
 
-  async createCustomer(userId: number): Promise<void> {
+  async createCustomer(
+    userId: number,
+    tx?: Prisma.TransactionClient
+  ): Promise<Customer> {
     try {
-      await this.prismaService.prisma.customer.upsert({
+      const client = tx.customer ?? this.prismaService.prisma.customer;
+      return await client.upsert({
         where: { userId },
         update: {},
         create: { userId },
@@ -18,18 +25,18 @@ export class CustomerRepository {
 
       return;
     } catch (error) {
-      throw new DatabaseError('CustomerRepository.createCustomer');
+      throw new DatabaseError("CustomerRepository.createCustomer");
     }
   }
-  async getCustomer(userId: number): Promise<Customer | null> {
+  async getCustomer(request: GetCustomerRequest): Promise<Customer | null> {
     try {
       return (
         (await this.prismaService.prisma.customer.findFirst({
-          where: { userId },
+          where: request,
         })) ?? null
       );
     } catch (error) {
-      throw new DatabaseError('CustomerRepository.getCustomer');
+      throw new DatabaseError("CustomerRepository.getCustomer");
     }
   }
 }

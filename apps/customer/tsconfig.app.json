@@ -1,9 +1,8 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.json", // Путь к корневому конфигу
   "compilerOptions": {
-    "declaration": false,
-    "outDir": "../../dist/apps/customer"
+    "outDir": "../../dist/apps/customer",
+    "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+  "include": ["src/**/*"]
 }

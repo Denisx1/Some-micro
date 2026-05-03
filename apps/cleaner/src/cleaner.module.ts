@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { PresentationModule } from './presentation/presentation.module';
-import { KafkaConsumerInterceptor } from '@app/common/system/interceptor/kafka.interceptor';
+import { ApplicationModule } from './application/application.module';
 
 @Module({
   imports: [
@@ -12,6 +12,8 @@ import { KafkaConsumerInterceptor } from '@app/common/system/interceptor/kafka.i
     }),
     InfrastructureModule,
     PresentationModule,
+    ApplicationModule,
   ],
+  providers: [],
 })
 export class CleanerMainModule {}

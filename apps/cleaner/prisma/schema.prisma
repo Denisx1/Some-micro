@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../../../libs/common/src/infrastructure/prisma/generated/cleaner"
+  output   = "../../../libs/cleaner/src/infrastructure/prisma/generated"
   binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 

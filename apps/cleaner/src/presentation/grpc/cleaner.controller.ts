@@ -1,83 +1,101 @@
-import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
-import { filter, finalize, map, merge, Observable, Subject, tap } from 'rxjs';
 import {
-  CleanerServiceController,
-  CreationSchedule,
-  GetJob,
-  GetProfile,
-  GetSchedule,
-  JobsArray,
-  ScheduleList,
-  ServiceStreamResponce,
-  UpdateJob,
-  UpdateProfile,
-  UpdateScheduleSlot,
-} from '@app/common/domain/types/grpc.services.types/cleaner';
-
-import { InternalRpcExceptionsFilter } from '@app/common/system';
-import { ProfileFacade } from '../../modules/profile/application/profile.facade';
-import { ScheduleFacade } from '../../modules/schedule/application/schedule.facade';
-import { JobFacade } from '../../modules/job/application/job.facade';
+  CreateScheduleCommand,
+  UpdateProfileCommand,
+  UpdateScheduleCommand,
+} from "@app/cleaner/domain/command";
 import {
-  CleanerJob,
+  GetCleanerQuery,
+  GetJobQuery,
+  GetScheduleQuery,
+} from "@app/cleaner/domain/query";
+import { GetJob } from "@app/cleaner/domain/types";
+import { CleanerJob } from "@app/cleaner/infrastructure/prisma/generated";
+import { ActionResponse } from "@app/common";
+import {
   CleanerProfile,
-  CleanerScheduleDay,
-  CleanerScheduleSlot,
-} from '@app/common/infrastructure/prisma/generated/cleaner';
-import { OrderStatus } from '@app/common/infrastructure/prisma/generated/order';
-import { StreamService } from '@app/common/system/stream/stream.manager.service';
-
+  GetterOthers,
+  GetterProfileRequest,
+  SaveDayScheduleRequest,
+  ScheduleDay,
+  UpdateProfileRequest,
+  UpdateSlotRequest,
+} from "@app/common/contracts/cleaner/cleaner.grpc.types";
+import { Controller } from "@nestjs/common";
+import { CommandBus, QueryBus } from "@nestjs/cqrs";
+import { GrpcMethod } from "@nestjs/microservices";
+import { from, map, Observable, switchMap } from "rxjs";
+// implements CleanerServiceController
 @Controller()
-export class CleanerGrpcController implements CleanerServiceController {
+export class CleanerGrpcController {
   constructor(
-    private readonly profileFacade: ProfileFacade,
-    private readonly scheduleFacade: ScheduleFacade,
-    private readonly jobFacade: JobFacade,
-    private readonly streamService: StreamService,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus
   ) {}
-
-  @GrpcMethod('CleanerService', 'UpdateCleanerProfile')
-  updateCleanerProfile(request: UpdateProfile): Observable<CleanerProfile> {
-    return this.profileFacade.updateProfile(request);
+  @GrpcMethod("CleanerService", "GetProfile")
+  async getProfile(request: GetterProfileRequest): Promise<CleanerProfile> {
+    return await this.queryBus.execute(new GetCleanerQuery(request));
   }
-
-  @GrpcMethod('CleanerService', 'SaveDaySchedule')
-  saveDaySchedule(request: CreationSchedule): Observable<CleanerScheduleDay> {
-    return this.scheduleFacade.createSchedule(request);
+  @GrpcMethod("CleanerService", "UpdateProfile")
+  async updateProfile(request: UpdateProfileRequest): Promise<ActionResponse> {
+    const updatedId = await this.commandBus.execute(
+      new UpdateProfileCommand(request)
+    );
+    return { success: true, id: updatedId };
   }
-
-  @GrpcMethod('CleanerService', 'GetProfile')
-  getProfile(request: GetProfile): Observable<CleanerProfile> {
-    return this.profileFacade.getOneProfile(request);
+  @GrpcMethod("CleanerService", "SaveDaySchedule")
+  async saveDaySchedule(
+    request: SaveDayScheduleRequest
+  ): Promise<ActionResponse> {
+    const scheduleId = await this.commandBus.execute(
+      new CreateScheduleCommand(request)
+    );
+    return { success: true, id: scheduleId };
   }
-
-  @GrpcMethod('CleanerService', 'SubscribeNotifications')
-  subscribeNotifications(data: {
-    profileId: number;
-  }): Observable<ServiceStreamResponce> {
-    return this.profileFacade.getStreamData(data.profileId);
+  @GrpcMethod("CleanerService", "UpdateSlot")
+  async updateSlot(request: UpdateSlotRequest): Promise<ActionResponse> {
+    const slotId = await this.commandBus.execute(
+      new UpdateScheduleCommand(request)
+    );
+    return { success: true, id: slotId };
   }
-  // @GrpcMethod('CleanerService', 'GetReviews')
-  // getReviews(request: GetRewievs): Observable<CleanerServiceResponse> {}
-
-  @GrpcMethod('CleanerService', 'AcceptJob')
-  acceptJob(request: UpdateJob): Observable<CleanerJob> {
-    return this.jobFacade.acceptJob(request);
+  @GrpcMethod("CleanerService", "GetJobs")
+  getJobs(request: GetJob): Observable<CleanerJob> {
+    return from(
+      this.queryBus.execute<GetJobQuery, Observable<CleanerJob>>(
+        new GetJobQuery(request)
+      )
+    ).pipe(switchMap((internalStream$) => internalStream$));
   }
-
-  @GrpcMethod('CleanerService', 'DeclineJob')
-  declineJob(request: UpdateJob): Observable<void> {
-    return this.jobFacade.declineJob(request);
-  }
-
-  @GrpcMethod('CleanerService', 'GetSchedule')
-  getSchedule(request: GetSchedule): Observable<ScheduleList> {
-    return this.scheduleFacade.getFullSchedule(request);
-  }
-
-  @GrpcMethod('CleanerService', 'UpdateSlot')
-  updateSlot(request: UpdateScheduleSlot): Observable<CleanerScheduleSlot> {
-    return this.scheduleFacade.updateSlot(request);
+  @GrpcMethod("CleanerService", "GetSchedule")
+  getSchedule(request: GetterOthers): Observable<ScheduleDay> {
+    return from(
+      this.queryBus.execute<GetScheduleQuery, Observable<ScheduleDay>>(
+        new GetScheduleQuery(request)
+      )
+    ).pipe(switchMap((internalStream$) => internalStream$));
   }
 }
+
+//   @GrpcMethod('CleanerService', 'UpdateCleanerProfile')
+//   updateCleanerProfile(request: UpdateProfile): Observable<CleanerProfile> {
+//     return this.commandProfileFacade.updateProfile(request);
+//   }
+
+//   // @GrpcMethod('CleanerService', 'GetReviews')
+//   // getReviews(request: GetRewievs): Observable<CleanerServiceResponse> {}
+
+//   @GrpcMethod('CleanerService', 'AcceptJob')
+//   acceptJob(request: UpdateJob): Observable<void> {
+//     return this.jobFacade.acceptJob(request);
+//   }
+
+//   @GrpcMethod('CleanerService', 'DeclineJob')
+//   declineJob(request: UpdateJob): Observable<void> {
+//     return this.jobFacade.declineJob(request);
+//   }
+
+//   @GrpcMethod('CleanerService', 'UpdateSlot')
+//   updateSlot(request: UpdateScheduleSlot): Observable<CleanerScheduleSlot> {
+//     return this.scheduleFacade.updateSlot(request);
+//   }
+// }

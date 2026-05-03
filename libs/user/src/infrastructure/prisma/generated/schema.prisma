@@ -1,0 +1,74 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../libs/user/src/infrastructure/prisma/generated"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  email           String    @unique
+  userName        String    @unique
+  password        String
+  isEmailVerified Boolean?  @default(true)
+  isActive        Boolean?  @default(false)
+  createdAt       DateTime? @default(now())
+  updatedAt       DateTime? @updatedAt
+  tokenVersion    Int?      @default(0)
+  phoneNumber     String?
+
+  // Связь с ролью
+  role   Role @relation(fields: [roleId], references: [id])
+  roleId Int
+
+  @@index([email, userName, id, isActive, roleId])
+  @@map("user")
+}
+
+model Candidate {
+  id          Int     @id @default(autoincrement())
+  email       String  @unique
+  userName    String  @unique
+  password    String
+  actionToken String?
+  // Связь с ролью
+  role        Role    @relation(fields: [roleId], references: [id])
+  roleId      Int
+
+  @@map("candidate")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String
+  permissions String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Обратные связи (чтобы Prisma знала, кто использует эту роль)
+  users      User[]
+  candidates Candidate[]
+
+  @@map("role")
+}
+
+model UserOutbox {
+  id            String   @id @default(uuid())
+  aggregateType String   @map("aggregatetype")
+  aggregateId   Int      @map("aggregateid")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("createdat")
+
+  @@map("user_outbox")
+}
+
+enum UsertOutboxStatus {
+  NEW
+  SENT
+  ERROR
+}

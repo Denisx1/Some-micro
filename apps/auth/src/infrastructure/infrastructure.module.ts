@@ -1,59 +1,51 @@
-import { GRPC_PRISMA_SERVICES } from '@app/common/domain';
-import {
-  AuthClient,
-  GrpcClientsService,
-  GrpcModule,
-  HashModule,
-  HashService,
-  KafkaModule,
-  PrismaModule,
-  RedisModule,
-  TokenModule,
-  TokenService,
-} from '@app/common/infrastructure';
-import { Module } from '@nestjs/common';
-import { AuthRepository } from './repositories/auth.repository';
-
-import { AuthCacheService } from './cashe/auth.cache.service';
-import { AuthOutboxRepository } from './repositories/auth.outbox.repository';
-import { AuthOutboxWorker } from './outbox.worker/outbox.worker';
-import { AuthKafkaService } from './providers';
-import { ScheduleModule } from '@nestjs/schedule';
-
+import { Module } from "@nestjs/common";
+import { AuthOutboxRepository } from "./repositories/auth.outbox.repository";
+import { CqrsModule } from "@nestjs/cqrs";
+import { PrismaModule } from "@app/common";
+import { PrismaClient as AuthClient, AuthPrismaService } from "@app/auth";
+import { RedisModule } from "@app/common/infrastructure/redis/redis.module";
+import { TokenService } from "./token/token.service";
+import { AuthCacheService } from "./cashe/auth.cache.service";
+import { AuthRepository } from "./repositories/auth.repository";
+import { GrpcModule } from "@app/auth/infrastructure/grpc/grpc.module";
+import { USER_SERVICE_NAME } from "@app/common/contracts/user/user.grpc.types";
+import { EGrpcService } from "@app/common/contracts/types";
+import { GrpcClientsService } from "@app/auth/infrastructure/grpc/grpc.service";
+import { grpcHandler } from "./grpc";
+import { authRepository } from "./repositories";
+import { HashModule } from "@app/common/infrastructure/hash/hash.module";
+import { HashService } from "@app/common/infrastructure/hash/hash.service";
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
-    GrpcModule.register([
-      GRPC_PRISMA_SERVICES.USER,
-      GRPC_PRISMA_SERVICES.CLEANER,
-      GRPC_PRISMA_SERVICES.CUSTOMER,
-    ]),
     PrismaModule.forRoot(AuthClient),
-    KafkaModule.register(GRPC_PRISMA_SERVICES.AUTH),
+    GrpcModule.register(),
     RedisModule,
     HashModule,
-    TokenModule,
+    // TokenModule,
+    CqrsModule,
   ],
   controllers: [],
   providers: [
+    ...grpcHandler,
+    ...authRepository,
+    AuthPrismaService,
+    TokenService,
     AuthCacheService,
     AuthRepository,
-    AuthOutboxWorker,
-    AuthOutboxRepository,
-    HashService,
-    TokenService,
-    AuthKafkaService,
     GrpcClientsService,
-  ],
-  exports: [
-    AuthCacheService,
-    AuthRepository,
-    RedisModule,
-    TokenModule,
     HashService,
+  ],
+
+  exports: [
+    ...grpcHandler,
+    ...authRepository,
+    RedisModule,
     TokenService,
-    AuthOutboxRepository,
-    AuthKafkaService,
+    HashService,
+    CqrsModule,
+    AuthPrismaService,
+    AuthCacheService,
+
     GrpcClientsService,
   ],
 })

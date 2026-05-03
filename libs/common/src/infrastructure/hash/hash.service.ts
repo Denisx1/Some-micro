@@ -1,6 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { genSalt, hash, compare } from 'bcrypt';
-import { status as GrpcStatus } from '@grpc/grpc-js';
+import { Injectable } from "@nestjs/common";
+import { genSalt, hash, compare } from "bcrypt";
 
 @Injectable()
 export class HashService {
@@ -22,7 +21,7 @@ export class HashService {
   }
   async compareHash(
     password: string,
-    hashedPassword: string,
+    hashedPassword: string
   ): Promise<boolean> {
     return await compare(password, hashedPassword);
   }

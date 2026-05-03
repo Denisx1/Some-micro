@@ -8,8 +8,9 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2021",
     "sourceMap": true,
-    "outDir": "./dist",
+    "ignoreDeprecations": "5.0", // или "6.0", если уже обновился
     "baseUrl": ".",
+    "outDir": "./dist",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
@@ -18,14 +19,24 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@app/common/domain": ["libs/common/src/domain"],
-      "@app/common/domain/*": ["libs/common/src/domain/*"],
-      "@app/common/infrastructure": ["libs/common/src/infrastructure"],
-      "@app/common/infrastructure/*": ["libs/common/src/infrastructure/*"],
-      "@app/common/system": ["libs/common/src/system"],
-      "@app/common/system/*": ["libs/common/src/system/*"]
+      "@app/common": ["libs/common/src"],
+      "@app/common/*": ["libs/common/src/*"],
+      "@app/user": ["libs/user/src"],
+      "@app/user/*": ["libs/user/src/*"],
+      "@app/auth": ["libs/auth/src"],
+      "@app/auth/*": ["libs/auth/src/*"],
+      "@app/cleaner": ["libs/cleaner/src/index.ts"],
+      "@app/cleaner/*": ["libs/cleaner/src/*"],
+      "@app/customer": ["libs/customer/src/index.ts"],
+      "@app/customer/*": ["libs/customer/src/*"],
+      "@app/notification": ["libs/notification/src/index.ts"],
+      "@app/notification/*": ["libs/notification/src/*"],
+      "@app/order": ["libs/order/src/index.ts"],
+      "@app/order/*": ["libs/order/src/*"]
     }
   },
-  "include": ["apps/**/*", "libs/**/*"],
+
   "exclude": ["node_modules", "dist"]
 }
+
+// docker exec -e SERVICE=user -it user npm run proto:generate

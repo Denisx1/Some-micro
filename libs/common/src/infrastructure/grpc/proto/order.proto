@@ -1,0 +1,65 @@
+syntax = "proto3";
+package order;
+
+service OrderService {
+    rpc CreateOrder(CreateNewOrderRequest) returns (ServiceCommandResponse);
+    rpc SelectCleaner(InviteCleanerRequest) returns (ServiceCommandResponse);
+
+    rpc GetOrderById(GetOrderRequest) returns (BaseOrder);
+    rpc GetOrderHistory(GetOrderRequest) returns (stream OrderHistory);
+
+}
+message ServiceCommandResponse {
+  string status = 1;
+  int32 id = 2;
+}
+
+message HistoryResponce {
+  repeated OrderHistory orderHistory =1;
+}
+message OrederInvitations{
+  
+}
+message HideCleanerRequest{
+  int32 cleanerProfileId = 1;
+  int32 customerId = 2;
+  int32 orderId = 3;
+}
+message InviteCleanerRequest{
+  int32 cleanerProfileId = 1;
+  int32 customerId = 2;
+  int32 orderId = 3;
+}
+
+
+message OrderHistory{
+  string id =1;
+  int32 aggregateId = 2;
+  string aggregateType = 3;
+}
+message GetOrderRequest{
+  int32 id = 1;
+}
+message CreateNewOrderRequest{
+    int32 customerId =1;
+    int32 zipCode =2;
+    string city = 3;
+    int32 dayOfWeek =4;
+    string fromTime =5;
+    string toTime = 6;
+    string clarifications = 7;
+}
+message BaseOrder{
+  int32 id = 1;
+  int32 customerId =2;
+  int32 zipCode =3;
+  string city = 4;
+  int32 dayOfWeek =5;
+  string fromTime =6;
+  string toTime = 7;
+  string status = 8;
+  int32 cleanerId = 9;
+  string clarifications = 10;
+}
+
+

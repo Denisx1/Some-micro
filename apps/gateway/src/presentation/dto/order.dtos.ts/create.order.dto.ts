@@ -21,4 +21,7 @@ export class CreateOrderDTO {
   })
   toTime: string;
   clarifications: string;
+  @IsInt()
+  @Min(1)
+  customerId: number;
 }
