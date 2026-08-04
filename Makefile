@@ -6,8 +6,6 @@ ifeq ($(OS),Windows_NT)
 else
     PROJECT_ROOT = $(shell pwd)
 endif
-
-
 .PHONY: help init-net infra-up infra-down infra-logs env-up env-down env-cleanup migrate-create migrate-up migrate-down migrate-action run dev-all
 
 ifdef s
@@ -91,5 +89,9 @@ env-port-close: check-s ## Закрыть проброс портов (usage: ma
 	@docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) stop port-forwarder
 	@docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) rm -f port-forwarder
 
-run: check-s ## Запустить Go-код сервиса локально (usage: make run s=my-service)
-	@cd $(SERVICE_DIR) && go run main.go
+grpc-gen:
+	@docker run --rm -v "$(CURDIR):/workspace" -w /workspace my-buf-go generate
+run: check-s ## Запустить Go-код сервиса локально (usage: make run s=customer)
+	@if not exist ".tmp" mkdir .tmp
+	@cd apps/$(s) && go build -o ../../.tmp/$(s).exe ./cmd/main.go
+	@.tmp/$(s).exe
