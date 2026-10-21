@@ -1,0 +1,5 @@
+.env
+out
+.git
+go.mod
+go.sum

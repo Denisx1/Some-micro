@@ -1,0 +1,13 @@
+version: v1
+plugins:
+  # Генерация обычных Go DTO для Protobuf
+  - name: go
+    out: .
+    opt:
+      - module=github.com/Denisx1/Some-micro
+
+  # Генерация gRPC Клиентов и Серверов
+  - name: go-grpc
+    out: .
+    opt:
+      - module=github.com/Denisx1/Some-micro

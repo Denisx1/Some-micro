@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package customer.v1;
+
+import "buf/validate/validate.proto";
+
+// Обязательная строка для Go-плагинов:
+option go_package = "github.com/Denisx1/Some-micro/pkg/pb/customer/v1;customerv1";
+
+service CustomerService {
+    rpc CreateCustomer(CreateCustomerRequest) returns (Customer);
+    rpc GetCustomer(GetCustomerRequest) returns (Customer);
+}
+
+message GetCustomerRequest{
+  oneof identifier {
+    option (buf.validate.oneof).required = true; // Обязательно передать одно из полей
+
+    string user_id = 1 [(buf.validate.field).string.uuid = true];
+    string id = 2  [(buf.validate.field).string.uuid = true];
+  }
+}
+
+message CreateCustomerRequest {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+  optional string first_name = 2 [(buf.validate.field).string = {
+    min_len: 2,
+    max_len: 50
+  }];
+  optional string last_name = 3 [(buf.validate.field).string = {
+    max_len: 50
+  }];
+}
+
+message Customer {
+    string id = 1;
+    int32 version = 2;
+    string user_id = 3;
+    optional string first_name = 4;
+    optional string last_name = 5;
+}

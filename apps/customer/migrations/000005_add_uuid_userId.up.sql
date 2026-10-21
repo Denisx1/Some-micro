@@ -1,0 +1,5 @@
+
+ALTER TABLE customer.profile 
+    ALTER COLUMN user_id DROP DEFAULT,
+    ALTER COLUMN user_id SET DATA TYPE UUID USING NULL,
+    ALTER COLUMN user_id SET DEFAULT uuidv7();  

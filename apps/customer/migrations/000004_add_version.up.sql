@@ -1,0 +1,2 @@
+ALTER TABLE customer.profile
+    ADD COLUMN version BIGINT NOT NULL DEFAULT 1;

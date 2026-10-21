@@ -2,72 +2,78 @@ package main
 
 import (
 	"context"
-	core_config "customer/internal/core/config"
+	"log"
+	grpc_server "pkg/grpc/server"
+	customerv1 "pkg/pb/customer/v1"
+	core_pgx_pool "pkg/postgres/pgx"
+	core_zap_logger "pkg/zap"
+
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
-	pkg_core_database_postgres "pkg/core/database/postgres"
 	"syscall"
-	"time"
 
-	"google.golang.org/grpc"
-)
-
-const (
-	grpcPort = 50051 // Или читай из конфига/окружения
+	core_config "customer/internal/core/config"
+	customer_postgres_repository "customer/internal/feature/customer/repository"
+	customer_service "customer/internal/feature/customer/service"
+	customer_transport_grpc "customer/internal/feature/customer/transport/grpc"
 )
 
 func main() {
-	cfg := core_config.NewConfigMust()
-	time.Local = cfg.TimeZone
-
+	appCfg := core_config.NewAppConfigMust()
 	ctx, cancel := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 	defer cancel()
-
-	pool, err := pkg_core_database_postgres.NewPool(
-		ctx, pkg_core_database_postgres.NewConfigMust(),
-	)
+	logger, err := core_zap_logger.NewZapLogger(core_zap_logger.NewLoggerConfigMust())
 	if err != nil {
-		panic(err)
-	}
-	defer pool.Close()
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-	if err != nil {
+		fmt.Println("Failed to init application logger")
 		os.Exit(1)
 	}
-	grpcServer := grpc.NewServer()
+	defer logger.Close()
+	logger.Debug("Application time zone", "zone", appCfg.TimeZone)
+	logger.Debug("initializing postgres connection pool")
 
-	// TODO: Регистрируем твой сгенерированный сервис
-	// customerService := delivery.NewCustomerHandler(pgPool)
-	// pb.RegisterCustomerServiceServer(grpcServer, customerService)
-
-	// 7. Запускаем gRPC-сервер в отдельной горутине, чтобы не блокировать main
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil && err != grpc.ErrServerStopped {
-			os.Exit(1) // Останавливаем приложение при сбое сервера
-		}
-	}()
-
-	// 8. Ожидаем сигнал остановки (SIGINT / SIGTERM / Ctrl+C)
-	<-ctx.Done()
-	// 9. Плавная остановка gRPC-сервера (дожидается завершения активных RPC-запросов)
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	stopped := make(chan struct{})
-	go func() {
-		grpcServer.GracefulStop()
-		close(stopped)
-	}()
-
-	select {
-	case <-stopped:
-	case <-shutdownCtx.Done():
-		grpcServer.Stop()
+	pool, err := core_pgx_pool.NewPool(
+		ctx, core_pgx_pool.NewPostgresConfigMust(),
+	)
+	if err != nil {
+		logger.Fatal("failed to init postgres connection pool", "err", err)
 	}
+	defer pool.Close()
+	logger.Debug("Database succesfully connected")
+	defer pool.Close()
+	customerRepository := customer_postgres_repository.NewCustomerRepository(pool)
+	customerService := customer_service.NewCustomerService(customerRepository)
+	customerTransport := customer_transport_grpc.NewCustomerGRPCHandler(customerService)
+	grpcServer, err := grpc_server.NewServer(
+		appCfg.Grpc,
+		logger,
+	)
+	if err != nil {
+		logger.Fatal("failed to create grpc server: %v", err)
+	}
+	// 3. Включаем Reflection (для удобного тестирования)
+	grpcServer.EnableReflection()
+	customerv1.RegisterCustomerServiceServer(grpcServer, customerTransport)
+	go func() {
+		logger.Debug("gRPC Server is running", "port", appCfg.Grpc)
+		if err := grpcServer.Start(); err != nil {
+			log.Fatal("grpc server error", err)
+			return
+		}
+		logger.Debug("gRPC Server strted", "port", appCfg.Grpc)
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down gRPC server...")
+	if err := grpcServer.Close(); err != nil {
+		log.Printf("error closing server: %v", err)
+	}
+	log.Println("Server stopped")
+
 }
